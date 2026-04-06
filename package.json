@@ -1,11 +1,13 @@
 {
   "name": "skilltune",
   "description": "Optimize Claude skill descriptions for reliable triggering",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "bin": {
     "skilltune": "./dist/app/index.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "scripts": {
     "build": "tsc",
