@@ -3,14 +3,15 @@ import { cli } from "gunshi";
 import evalCmd from "../features/evaluate/index.js";
 import generateQueriesCmd from "../features/generate-queries/index.js";
 import optimizeCmd from "../features/optimize/index.js";
+import pkg from "../../package.json" with { type: "json" };
 
 await cli(
   process.argv.slice(2),
-  { name: "skilltune" },
+  { name: pkg.name },
   {
-    name: "skilltune",
-    description: "Optimize Claude skill descriptions for reliable triggering",
-    version: "0.1.0",
+    name: pkg.name,
+    description: pkg.description,
+    version: pkg.version,
     subCommands: {
       eval: evalCmd,
       "generate-queries": generateQueriesCmd,
