@@ -20,12 +20,30 @@ export interface ClaudeOutput {
 }
 
 export async function runClaude(prompt: string): Promise<ClaudeOutput> {
-  const { stdout } = await execFileAsync(
-    "claude",
-    ["-p", prompt, "--output-format", "json"],
-    { maxBuffer: 10 * 1024 * 1024 }
-  );
-  return JSON.parse(stdout) as ClaudeOutput;
+  let stdout: string;
+  try {
+    ({ stdout } = await execFileAsync(
+      "claude",
+      ["-p", prompt, "--output-format", "stream-json", "--verbose"],
+      { maxBuffer: 10 * 1024 * 1024 }
+    ));
+  } catch (err: any) {
+    if (!err.stdout) throw err;
+    stdout = err.stdout;
+  }
+  const events: any[] = stdout
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+  const resultEvent = events.find((e) => e.type === "result");
+  if (resultEvent?.is_error) {
+    throw new Error(`Claude error: ${resultEvent.result}`);
+  }
+  const messages: Message[] = events
+    .filter((e) => e.type === "assistant")
+    .map((e) => e.message);
+  return { messages };
 }
 
 export function isSkillTriggered(output: ClaudeOutput, skillName: string): boolean {

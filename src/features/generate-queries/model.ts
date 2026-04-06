@@ -30,7 +30,8 @@ Return ONLY a valid JSON array, no explanation.`;
   const output = await runClaude(prompt);
   const text = extractLastAssistantText(output);
   if (!text) throw new Error("No response from Claude");
-  return JSON.parse(text) as Query[];
+  const cleaned = text.replace(/^```(?:json)?\s*/m, "").replace(/\s*```\s*$/m, "").trim();
+  return JSON.parse(cleaned) as Query[];
 }
 
 export function saveQueries(queries: Query[], outputPath: string): void {
