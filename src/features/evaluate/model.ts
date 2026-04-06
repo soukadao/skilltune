@@ -34,11 +34,12 @@ export async function evaluateAll(
   threshold: number,
   onProgress?: (result: QueryResult) => void
 ): Promise<EvalResult> {
-  const results: QueryResult[] = [];
-  for (const query of queries) {
-    const result = await evaluateQuery(query, skillName, runs, threshold);
-    results.push(result);
-    onProgress?.(result);
-  }
+  const results = await Promise.all(
+    queries.map(async (query) => {
+      const result = await evaluateQuery(query, skillName, runs, threshold);
+      onProgress?.(result);
+      return result;
+    })
+  );
   return summarize(results);
 }

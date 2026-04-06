@@ -27,6 +27,7 @@ export async function run(ctx: Ctx): Promise<void> {
       maxIterations: ctx.values["max-iterations"],
       threshold: ctx.values.threshold,
       trainRatio: ctx.values["train-ratio"],
+      patience: ctx.values.patience,
     },
     queries,
     console.log

@@ -43,5 +43,10 @@ export default define({
       description: "Number of queries to generate (if --queries omitted)",
       default: 20,
     },
+    patience: {
+      type: "number",
+      description: "Early stopping: halt if validation does not improve for this many iterations",
+      default: 3,
+    },
   },
 });
