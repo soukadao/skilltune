@@ -1,0 +1,21 @@
+{
+  "name": "skilltune",
+  "description": "Optimize Claude skill descriptions for reliable triggering",
+  "version": "0.0.1",
+  "bin": {
+    "skilltune": "./dist/app/index.js"
+  },
+  "files": ["dist"],
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "tsc"
+  },
+  "dependencies": {
+    "gunshi": "^0.29.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "typescript": "^6.0.2"
+  }
+}
