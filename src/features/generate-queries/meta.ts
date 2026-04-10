@@ -2,12 +2,11 @@ import { define } from "gunshi/definition";
 
 export default define({
   name: "generate-queries",
-  description: "Generate eval queries from a SKILL.md using Claude",
+  description: "Generate eval queries from a skill using Claude",
   args: {
-    "skill-file": {
+    skill: {
       type: "string",
-      description: "Path to SKILL.md",
-      default: "SKILL.md",
+      description: "Skill name (resolves to .claude/skills/<name>)",
     },
     count: {
       type: "number",

@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import path from "node:path";
 
 export interface Skill {
   name: string;
@@ -29,4 +30,12 @@ export function applyDescriptionChange(content: string, newDescription: string):
 
 export function writeSkill(filePath: string, content: string): void {
   writeFileSync(filePath, content);
+}
+
+export function resolveSkillFile(skillName: string): string {
+  const base = path.join(".claude", "skills", skillName);
+  if (existsSync(base)) return base;
+  const withMd = base + ".md";
+  if (existsSync(withMd)) return withMd;
+  throw new Error(`Skill file not found: ${base}`);
 }

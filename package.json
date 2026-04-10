@@ -1,7 +1,8 @@
 {
   "name": "skilltune",
   "description": "Optimize Claude skill descriptions for reliable triggering",
-  "version": "0.0.3",
+  "version": "0.0.4",
+  "license": "MIT",
   "bin": {
     "skilltune": "./dist/app/index.js"
   },

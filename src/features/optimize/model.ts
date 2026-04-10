@@ -4,11 +4,15 @@ import { splitQueries } from "../../entities/query/index.js";
 import { readSkill, parseSkill, applyDescriptionChange } from "../../entities/skill/index.js";
 import { evaluateAll } from "../evaluate/model.js";
 import type { Query } from "../../entities/query/index.js";
-import type { QueryResult } from "../../entities/result/index.js";
+import type { QueryResult, EvalResult } from "../../entities/result/index.js";
 
 interface DescriptionAttempt {
   description: string;
-  trainPassRate: number;
+  trainScore: number;
+}
+
+function calcScore(result: EvalResult): number {
+  return result.positive_rate * (1 - result.misuse_rate);
 }
 
 function extractDescription(text: string, fallback: string): string {
@@ -45,7 +49,7 @@ async function proposeDescription(
 ${history
   .map(
     (h, i) =>
-      `Attempt ${i + 1} (train pass rate: ${(h.trainPassRate * 100).toFixed(0)}%):\n${h.description}`
+      `Attempt ${i + 1} (train score: ${(h.trainScore * 100).toFixed(0)}%):\n${h.description}`
   )
   .join("\n\n")}
 `
@@ -56,14 +60,14 @@ ${history
 Current description:
 ${currentDesc}
 
-SKILL.md:
+Skill content:
 ${skillContent}
 ${historySection}
 Training failures:
-- Should have triggered but didn't (${shouldFail.length}):
-${shouldFail.map((f) => `  - "${f.query}"`).join("\n")}
+- Should have triggered but didn't or undertriggered (${shouldFail.length}):
+${shouldFail.map((f) => `  - "${f.query}" (${f.triggers}/${f.runs} triggers)`).join("\n")}
 - Should NOT have triggered but did (${shouldNotFail.length}):
-${shouldNotFail.map((f) => `  - "${f.query}"`).join("\n")}
+${shouldNotFail.map((f) => `  - "${f.query}" (${f.triggers}/${f.runs} triggers)`).join("\n")}
 
 Rules:
 - Use imperative phrasing ("Use this skill when...")
@@ -91,17 +95,15 @@ Your new description here
 
 export interface OptimizeLoopConfig {
   skillFile: string;
-  skillName: string;
   runs: number;
   maxIterations: number;
-  threshold: number;
   trainRatio: number;
   patience: number;
 }
 
 export interface OptimizeResult {
   bestDescription: string;
-  bestValidationRate: number;
+  bestValidationScore: number;
   totalIterations: number;
 }
 
@@ -110,12 +112,13 @@ export async function runOptimizeLoop(
   queries: Query[],
   onProgress: (msg: string) => void
 ): Promise<OptimizeResult> {
-  const { skillFile, skillName, runs, maxIterations, threshold, trainRatio, patience } = config;
-  const { train, validation } = splitQueries(queries, trainRatio);
-  onProgress(`Split: ${train.length} train / ${validation.length} validation`);
-
+  const { skillFile, runs, maxIterations, trainRatio, patience } = config;
   let skillContent = readSkill(skillFile).content;
-  let best: { validationRate: number; description: string; content: string } | undefined;
+  const skillName = parseSkill(skillContent).name;
+  const { train, validation } = splitQueries(queries, trainRatio);
+  onProgress(`Skill: ${skillName}`);
+  onProgress(`Split: ${train.length} train / ${validation.length} validation`);
+  let best: { validationScore: number; description: string; content: string } | undefined;
   let noImprovementCount = 0;
   let totalIterations = maxIterations;
   const history: DescriptionAttempt[] = [];
@@ -126,29 +129,32 @@ export async function runOptimizeLoop(
     onProgress(`Description (${description.length} chars):\n${description}`);
 
     const [trainResult, valResult] = await Promise.all([
-      evaluateAll(train, skillName, runs, threshold, (r) => {
+      evaluateAll(train, skillName, runs, (r) => {
         onProgress(
-          `[TRAIN][${r.passed ? "PASS" : "FAIL"}] rate=${r.trigger_rate.toFixed(2)} "${r.query.slice(0, 60)}..."`
+          `[TRAIN][${r.index}] trigger_rate=${r.trigger_rate.toFixed(2)} "${r.query.slice(0, 60)}..."`
         );
       }),
-      evaluateAll(validation, skillName, runs, threshold),
+      evaluateAll(validation, skillName, runs),
     ]);
 
+    const trainScore = calcScore(trainResult);
+    const valScore = calcScore(valResult);
+
     onProgress(
-      `Train: ${trainResult.passed}/${trainResult.total} (${(trainResult.pass_rate * 100).toFixed(0)}%)`
+      `Train: positive=${(trainResult.positive_rate * 100).toFixed(0)}% misuse=${(trainResult.misuse_rate * 100).toFixed(0)}% failed=${trainResult.failed_indices.length}`
     );
     onProgress(
-      `Validation: ${valResult.passed}/${valResult.total} (${(valResult.pass_rate * 100).toFixed(0)}%)`
+      `Validation: positive=${(valResult.positive_rate * 100).toFixed(0)}% misuse=${(valResult.misuse_rate * 100).toFixed(0)}% failed=${valResult.failed_indices.length}`
     );
 
-    if (best === undefined || valResult.pass_rate > best.validationRate) {
-      best = { validationRate: valResult.pass_rate, description, content: skillContent };
+    if (best === undefined || valScore > best.validationScore) {
+      best = { validationScore: valScore, description, content: skillContent };
       noImprovementCount = 0;
     } else {
       noImprovementCount++;
     }
 
-    if (trainResult.pass_rate === 1.0 || iter === maxIterations) {
+    if (trainResult.failed_indices.length === 0 || iter === maxIterations) {
       totalIterations = iter;
       break;
     }
@@ -159,9 +165,11 @@ export async function runOptimizeLoop(
       break;
     }
 
-    const failures = trainResult.results.filter((r) => !r.passed);
+    const failures = trainResult.results.filter((r) =>
+      r.should_trigger ? r.triggers < r.runs : r.triggers > 0
+    );
     const newDesc = await proposeDescription(description, failures, skillContent, history);
-    history.push({ description, trainPassRate: trainResult.pass_rate });
+    history.push({ description, trainScore });
     skillContent = applyDescriptionChange(skillContent, newDesc);
     writeFileSync(skillFile, skillContent);
   }
@@ -170,7 +178,7 @@ export async function runOptimizeLoop(
   writeFileSync(skillFile, finalBest.content);
   return {
     bestDescription: finalBest.description,
-    bestValidationRate: finalBest.validationRate,
+    bestValidationScore: finalBest.validationScore,
     totalIterations,
   };
 }

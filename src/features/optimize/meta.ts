@@ -4,15 +4,9 @@ export default define({
   name: "optimize",
   description: "Run the full description optimization loop",
   args: {
-    "skill-file": {
-      type: "string",
-      description: "Path to SKILL.md",
-      default: "SKILL.md",
-    },
     skill: {
       type: "string",
-      description: "Skill name to check for",
-      default: "my-skill",
+      description: "Skill name (resolves to .claude/skills/<name>)",
     },
     queries: {
       type: "string",
@@ -27,11 +21,6 @@ export default define({
       type: "number",
       description: "Max optimization iterations",
       default: 5,
-    },
-    threshold: {
-      type: "number",
-      description: "Trigger rate threshold (0.0-1.0)",
-      default: 0.5,
     },
     "train-ratio": {
       type: "number",
