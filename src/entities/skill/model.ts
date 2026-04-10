@@ -34,6 +34,8 @@ export function writeSkill(filePath: string, content: string): void {
 
 export function resolveSkillFile(skillName: string): string {
   const base = path.join(".claude", "skills", skillName);
+  const dirSkill = path.join(base, "SKILL.md");
+  if (existsSync(dirSkill)) return dirSkill;
   if (existsSync(base)) return base;
   const withMd = base + ".md";
   if (existsSync(withMd)) return withMd;

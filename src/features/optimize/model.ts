@@ -103,6 +103,7 @@ export interface OptimizeLoopConfig {
 
 export interface OptimizeResult {
   bestDescription: string;
+  initialValidationScore: number;
   bestValidationScore: number;
   totalIterations: number;
 }
@@ -119,6 +120,7 @@ export async function runOptimizeLoop(
   onProgress(`Skill: ${skillName}`);
   onProgress(`Split: ${train.length} train / ${validation.length} validation`);
   let best: { validationScore: number; description: string; content: string } | undefined;
+  let initialValidationScore: number | undefined;
   let noImprovementCount = 0;
   let totalIterations = maxIterations;
   const history: DescriptionAttempt[] = [];
@@ -139,6 +141,8 @@ export async function runOptimizeLoop(
 
     const trainScore = calcScore(trainResult);
     const valScore = calcScore(valResult);
+
+    if (initialValidationScore === undefined) initialValidationScore = valScore;
 
     onProgress(
       `Train: positive=${(trainResult.positive_rate * 100).toFixed(0)}% misuse=${(trainResult.misuse_rate * 100).toFixed(0)}% failed=${trainResult.failed_indices.length}`
@@ -178,6 +182,7 @@ export async function runOptimizeLoop(
   writeFileSync(skillFile, finalBest.content);
   return {
     bestDescription: finalBest.description,
+    initialValidationScore: initialValidationScore!,
     bestValidationScore: finalBest.validationScore,
     totalIterations,
   };

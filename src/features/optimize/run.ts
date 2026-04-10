@@ -34,8 +34,10 @@ export async function run(ctx: Ctx): Promise<void> {
     console.log
   );
 
+  const improvement = result.bestValidationScore - result.initialValidationScore;
   console.log(`\n=== Result ===`);
-  console.log(`Best validation score: ${(result.bestValidationScore * 100).toFixed(0)}%`);
+  console.log(`Initial validation score: ${(result.initialValidationScore * 100).toFixed(0)}%`);
+  console.log(`Best validation score:    ${(result.bestValidationScore * 100).toFixed(0)}% (${improvement >= 0 ? "+" : ""}${(improvement * 100).toFixed(0)}%)`);
   console.log(`Best description:\n${result.bestDescription}`);
   console.log(`\nUpdated ${skillFile}`);
 }
