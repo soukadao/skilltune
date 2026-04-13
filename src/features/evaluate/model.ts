@@ -1,4 +1,4 @@
-import { runClaude, isSkillTriggered } from "../../shared/claude/index.js";
+import { checkSkillTriggered } from "../../shared/claude/index.js";
 import { summarize } from "../../entities/result/index.js";
 import type { Query } from "../../entities/query/index.js";
 import type { QueryResult, EvalResult } from "../../entities/result/index.js";
@@ -7,12 +7,13 @@ export async function evaluateQuery(
   query: Query,
   index: number,
   skillName: string,
-  runs: number
+  runs: number,
+  cwd: string = process.cwd()
 ): Promise<QueryResult> {
-  const outputs = await Promise.all(
-    Array.from({ length: runs }, () => runClaude(query.query))
+  const results = await Promise.all(
+    Array.from({ length: runs }, () => checkSkillTriggered(query.query, cwd, skillName))
   );
-  const triggers = outputs.filter((o) => isSkillTriggered(o, skillName)).length;
+  const triggers = results.filter(Boolean).length;
   const trigger_rate = triggers / runs;
   return {
     index,
@@ -28,11 +29,12 @@ export async function evaluateAll(
   queries: Query[],
   skillName: string,
   runs: number,
-  onProgress?: (result: QueryResult) => void
+  onProgress?: (result: QueryResult) => void,
+  cwd: string = process.cwd()
 ): Promise<EvalResult> {
   const results = await Promise.all(
     queries.map(async (query, index) => {
-      const result = await evaluateQuery(query, index, skillName, runs);
+      const result = await evaluateQuery(query, index, skillName, runs, cwd);
       onProgress?.(result);
       return result;
     })

@@ -1,5 +1,5 @@
 import { writeFileSync } from "node:fs";
-import { runClaude, extractLastAssistantText } from "../../shared/claude/index.js";
+import { runClaude } from "../../shared/claude/index.js";
 import { splitQueries } from "../../entities/query/index.js";
 import { readSkill, parseSkill, applyDescriptionChange } from "../../entities/skill/index.js";
 import { evaluateAll } from "../evaluate/model.js";
@@ -29,8 +29,7 @@ ${desc}
 
 Wrap the result in <description> tags.`;
 
-  const output = await runClaude(prompt);
-  const text = extractLastAssistantText(output) ?? "";
+  const text = await runClaude(prompt, process.cwd());
   return extractDescription(text, desc);
 }
 
@@ -82,8 +81,7 @@ Wrap the new description in <description> tags like this:
 Your new description here
 </description>`;
 
-  const output = await runClaude(prompt);
-  const text = extractLastAssistantText(output) ?? "";
+  const text = await runClaude(prompt, process.cwd());
   let description = extractDescription(text, currentDesc);
 
   if (description.length > 1024) {

@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { runClaude, extractLastAssistantText } from "../../shared/claude/index.js";
+import { runClaude } from "../../shared/claude/index.js";
 import type { Query } from "../../entities/query/index.js";
 
 export async function generateQueries(
@@ -27,8 +27,7 @@ ${skillContent}
 
 Return ONLY a valid JSON array, no explanation.`;
 
-  const output = await runClaude(prompt);
-  const text = extractLastAssistantText(output);
+  const text = await runClaude(prompt, process.cwd());
   if (!text) throw new Error("No response from Claude");
   const cleaned = text.replace(/^```(?:json)?\s*/m, "").replace(/\s*```\s*$/m, "").trim();
   return JSON.parse(cleaned) as Query[];

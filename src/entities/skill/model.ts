@@ -32,8 +32,15 @@ export function writeSkill(filePath: string, content: string): void {
   writeFileSync(filePath, content);
 }
 
-export function resolveSkillFile(skillName: string): string {
-  const base = path.join(".claude", "skills", skillName);
+export function resolveSkillFile(skillDir: string): string {
+  // If the input looks like a path (absolute, or contains a separator), treat it directly
+  if (path.isAbsolute(skillDir) || skillDir.includes(path.sep) || skillDir.includes("/")) {
+    const dirSkill = path.join(skillDir, "SKILL.md");
+    if (existsSync(dirSkill)) return dirSkill;
+    throw new Error(`SKILL.md not found in directory: ${skillDir}`);
+  }
+  // Name-based resolution: look under .claude/skills/<name>
+  const base = path.join(".claude", "skills", skillDir);
   const dirSkill = path.join(base, "SKILL.md");
   if (existsSync(dirSkill)) return dirSkill;
   if (existsSync(base)) return base;

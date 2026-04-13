@@ -1,111 +1,120 @@
 # skilltune
 
-Claude Code のスキル `description` を最適化し、トリガー精度を向上させる CLI ツールです。
+A CLI tool that optimizes Claude Code skill `description` fields to improve trigger accuracy.
 
-## 概要
+## Overview
 
-Claude Code のスキルは `description` フィールドを元に呼び出しの判断が行われます。`skilltune` は以下のループでこの description を自動改善します。
+Claude Code skills are invoked based on their `description` field. `skilltune` automatically improves descriptions through the following loop:
 
 ```
-クエリ生成 → 評価（trigger rate 計測） → description 改善提案 → 繰り返し
+Generate queries → Evaluate (measure trigger rate) → Propose new description → Repeat
 ```
 
-`--skill` にスキル名を指定すると、プロジェクトルートの `.claude/skills/<name>` を自動参照します。
-
-## インストール
+## Installation
 
 ```bash
 npm install -g skilltune
 ```
 
-## 使い方
+## Requirements
 
-### クエリ生成
+- [Claude Code](https://claude.ai/code) (`CLAUDE_CODE_OAUTH_TOKEN` environment variable must be set)
+- Node.js 18+
 
-スキルの内容を元に、評価用クエリを Claude が自動生成します。
+## Usage
 
-```bash
-skilltune generate-queries --skill my-skill --output queries.json
-```
+### Optimize a skill directory (recommended)
 
-| オプション | デフォルト | 説明 |
-|-----------|-----------|------|
-| `--skill` | （必須） | スキル名（`.claude/skills/<name>` を参照） |
-| `--count` | `20` | 生成するクエリ数（半数が should_trigger:true、半数が false） |
-| `--output` | `queries.json` | 出力先ファイル |
-
-### 評価のみ
-
-既存のクエリファイルでトリガー率を測定します。
+Pass a skill directory path directly to run the full pipeline — query generation through optimization — in one shot. An error is raised if `SKILL.md` does not exist in the specified directory.
 
 ```bash
-skilltune eval --skill my-skill --queries queries.json
+skilltune .claude/skills/git-commit
+skilltune /absolute/path/to/my-skill
 ```
 
-結果として以下が出力されます。
+### Generate queries
 
-- **Positive rate**: `should_trigger: true` のクエリが実際に発火した割合
-- **Misuse rate**: `should_trigger: false` のクエリが誤って発火した割合
-- **Failed indices**: 期待と一致しなかったクエリの番号
-
-| オプション | デフォルト | 説明 |
-|-----------|-----------|------|
-| `--skill` | （必須） | スキル名（`.claude/skills/<name>` を参照） |
-| `--queries` | `queries.json` | クエリファイルのパス |
-| `--runs` | `3` | 1クエリあたりの実行回数 |
-
-### 最適化ループ
-
-評価 → description 改善 → 評価を繰り返し、最良の description をスキルファイルに書き戻します。
+Automatically generate evaluation queries from a skill using Claude.
 
 ```bash
-# クエリを自動生成して最適化
-skilltune optimize --skill my-skill
-
-# 既存クエリファイルを使って最適化
-skilltune optimize --skill my-skill --queries queries.json
+skilltune generate-queries --skill .claude/skills/git-commit --output queries.json
+# or use a short name (resolves to .claude/skills/<name>)
+skilltune generate-queries --skill git-commit --output queries.json
 ```
 
-| オプション | デフォルト | 説明 |
-|-----------|-----------|------|
-| `--skill` | （必須） | スキル名（`.claude/skills/<name>` を参照） |
-| `--queries` | （省略可） | クエリファイル。省略時は自動生成 |
-| `--runs` | `3` | 1クエリあたりの実行回数 |
-| `--max-iterations` | `5` | 最大イテレーション数 |
-| `--train-ratio` | `0.6` | train/validation の分割比率 |
-| `--count` | `20` | クエリ自動生成時の生成数 |
-| `--patience` | `3` | validation が改善しない場合の早期停止イテレーション数 |
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--skill` | (required) | Path to the skill directory, or a skill name (resolves to `.claude/skills/<name>`) |
+| `--count` | `20` | Number of queries to generate (half `should_trigger:true`, half `false`) |
+| `--output` | `queries.json` | Output file path |
 
-## クエリファイルの形式
+### Evaluate only
+
+Measure trigger rates against an existing query file.
+
+```bash
+skilltune eval --skill .claude/skills/git-commit --queries queries.json
+```
+
+Outputs:
+
+- **Positive rate**: fraction of `should_trigger: true` queries that actually triggered
+- **Misuse rate**: fraction of `should_trigger: false` queries that incorrectly triggered
+- **Failed indices**: query indices where the result did not match expectations
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--skill` | (required) | Path to the skill directory, or a skill name |
+| `--queries` | `queries.json` | Path to the query file |
+| `--runs` | `3` | Number of runs per query |
+
+### Optimization loop
+
+Iterates evaluate → propose description → evaluate, writing the best description back to the skill file.
+
+```bash
+# Auto-generate queries and optimize
+skilltune optimize --skill .claude/skills/git-commit
+
+# Use an existing query file
+skilltune optimize --skill .claude/skills/git-commit --queries queries.json
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--skill` | (required) | Path to the skill directory, or a skill name |
+| `--queries` | (optional) | Query file path; auto-generated if omitted |
+| `--runs` | `3` | Number of runs per query |
+| `--max-iterations` | `5` | Maximum number of optimization iterations |
+| `--train-ratio` | `0.6` | Train/validation split ratio |
+| `--count` | `20` | Number of queries to generate when `--queries` is omitted |
+| `--patience` | `3` | Early stopping: halt if validation does not improve for this many iterations |
+
+## Query file format
 
 ```json
 [
-  { "query": "スキルが呼ばれるべきプロンプト", "should_trigger": true },
-  { "query": "スキルが呼ばれるべきでないプロンプト", "should_trigger": false }
+  { "query": "A prompt that should trigger the skill", "should_trigger": true },
+  { "query": "A prompt that should not trigger the skill", "should_trigger": false }
 ]
 ```
 
-## アーキテクチャ
+## Architecture
 
-Feature-Sliced Design（FSD）に基づいた構成です。
+Structured following Feature-Sliced Design (FSD).
 
 ```
 src/
-  app/                        # エントリポイント（gunshi CLI）
+  app/                        # Entry point (gunshi CLI)
   features/
-    evaluate/                 # trigger rate 評価
-    generate-queries/         # Claude によるクエリ自動生成
-    optimize/                 # description 最適化ループ
+    evaluate/                 # Trigger rate evaluation
+    generate-queries/         # Automated query generation via Claude Agent SDK
+    optimize/                 # Description optimization loop
   entities/
-    query/                    # Query 型 + train/validation 分割
-    result/                   # QueryResult 型 + 集計
-    skill/                    # スキルファイルの読み書き・パース・パス解決
+    query/                    # Query type + train/validation split
+    result/                   # QueryResult type + aggregation
+    skill/                    # Skill file read/write, parsing, and path resolution
   shared/
-    claude/                   # claude -p 実行・出力パース
-    lib/                      # 汎用ユーティリティ
+    claude/                   # Claude Agent SDK wrapper
+    lib/                      # General utilities
 ```
-
-## 動作要件
-
-- [Claude Code](https://claude.ai/code)（`claude` コマンドが PATH に存在すること）
-- Node.js
