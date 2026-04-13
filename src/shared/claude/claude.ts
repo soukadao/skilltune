@@ -22,6 +22,37 @@ export async function runClaude(prompt: string, cwd: string): Promise<string> {
   return "";
 }
 
+export interface SessionResult {
+  result: string;
+  sessionId?: string;
+}
+
+export async function runClaudeWithSession(
+  prompt: string,
+  cwd: string,
+  sessionId?: string
+): Promise<SessionResult> {
+  let capturedSessionId: string | undefined;
+
+  for await (const message of query({
+    prompt,
+    options: {
+      cwd,
+      settingSources: [],
+      ...(sessionId ? { resume: sessionId } : {}),
+      env: { CLAUDE_CODE_OAUTH_TOKEN: getOauthToken() },
+    },
+  })) {
+    if (message.type === "system" && (message as any).subtype === "init") {
+      capturedSessionId = (message as any).session_id;
+    }
+    if ("result" in message && message.result) {
+      return { result: message.result as string, sessionId: capturedSessionId };
+    }
+  }
+  return { result: "", sessionId: capturedSessionId };
+}
+
 export async function checkSkillTriggered(
   prompt: string,
   cwd: string,

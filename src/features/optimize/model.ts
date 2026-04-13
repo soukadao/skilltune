@@ -1,15 +1,10 @@
 import { writeFileSync } from "node:fs";
-import { runClaude } from "../../shared/claude/index.js";
+import { runClaude, runClaudeWithSession } from "../../shared/claude/index.js";
 import { splitQueries } from "../../entities/query/index.js";
 import { readSkill, parseSkill, applyDescriptionChange } from "../../entities/skill/index.js";
 import { evaluateAll } from "../evaluate/model.js";
 import type { Query } from "../../entities/query/index.js";
 import type { QueryResult, EvalResult } from "../../entities/result/index.js";
-
-interface DescriptionAttempt {
-  description: string;
-  trainScore: number;
-}
 
 function calcScore(result: EvalResult): number {
   return result.positive_rate * (1 - result.misuse_rate);
@@ -37,36 +32,37 @@ async function proposeDescription(
   currentDesc: string,
   failures: QueryResult[],
   skillContent: string,
-  history: DescriptionAttempt[]
-): Promise<string> {
+  sessionId?: string
+): Promise<{ description: string; sessionId?: string }> {
   const shouldFail = failures.filter((f) => f.should_trigger);
   const shouldNotFail = failures.filter((f) => !f.should_trigger);
 
-  const historySection =
-    history.length > 0
-      ? `\nPrevious attempts (do not repeat these):
-${history
-  .map(
-    (h, i) =>
-      `Attempt ${i + 1} (train score: ${(h.trainScore * 100).toFixed(0)}%):\n${h.description}`
-  )
-  .join("\n\n")}
-`
-      : "";
+  const failuresSection = `Training failures:
+- Should have triggered but didn't or undertriggered (${shouldFail.length}):
+${shouldFail.map((f) => `  - "${f.query}" (${f.triggers}/${f.runs} triggers)`).join("\n")}
+- Should NOT have triggered but did (${shouldNotFail.length}):
+${shouldNotFail.map((f) => `  - "${f.query}" (${f.triggers}/${f.runs} triggers)`).join("\n")}`;
 
-  const prompt = `Optimize this Claude Code skill description for better trigger accuracy.
+  const prompt = sessionId
+    ? // Resumed session: Claude already knows the skill, rules, and history — send failures only
+      `Continue optimizing the description based on new training failures.
+
+${failuresSection}
+
+Wrap the new description in <description> tags like this:
+<description>
+Your new description here
+</description>`
+    : // First call: full context
+      `Optimize this Claude Code skill description for better trigger accuracy.
 
 Current description:
 ${currentDesc}
 
 Skill content:
 ${skillContent}
-${historySection}
-Training failures:
-- Should have triggered but didn't or undertriggered (${shouldFail.length}):
-${shouldFail.map((f) => `  - "${f.query}" (${f.triggers}/${f.runs} triggers)`).join("\n")}
-- Should NOT have triggered but did (${shouldNotFail.length}):
-${shouldNotFail.map((f) => `  - "${f.query}" (${f.triggers}/${f.runs} triggers)`).join("\n")}
+
+${failuresSection}
 
 Rules:
 - Use imperative phrasing ("Use this skill when...")
@@ -81,14 +77,18 @@ Wrap the new description in <description> tags like this:
 Your new description here
 </description>`;
 
-  const text = await runClaude(prompt, process.cwd());
+  const { result: text, sessionId: newSessionId } = await runClaudeWithSession(
+    prompt,
+    process.cwd(),
+    sessionId
+  );
   let description = extractDescription(text, currentDesc);
 
   if (description.length > 1024) {
     description = await shortenDescription(description);
   }
 
-  return description;
+  return { description, sessionId: newSessionId ?? sessionId };
 }
 
 export interface OptimizeLoopConfig {
@@ -121,7 +121,7 @@ export async function runOptimizeLoop(
   let initialValidationScore: number | undefined;
   let noImprovementCount = 0;
   let totalIterations = maxIterations;
-  const history: DescriptionAttempt[] = [];
+  let proposeSessionId: string | undefined;
 
   for (let iter = 1; iter <= maxIterations; iter++) {
     const { description } = parseSkill(skillContent);
@@ -170,8 +170,13 @@ export async function runOptimizeLoop(
     const failures = trainResult.results.filter((r) =>
       r.should_trigger ? r.triggers < r.runs : r.triggers > 0
     );
-    const newDesc = await proposeDescription(description, failures, skillContent, history);
-    history.push({ description, trainScore });
+    const { description: newDesc, sessionId } = await proposeDescription(
+      description,
+      failures,
+      skillContent,
+      proposeSessionId
+    );
+    proposeSessionId = sessionId ?? proposeSessionId;
     skillContent = applyDescriptionChange(skillContent, newDesc);
     writeFileSync(skillFile, skillContent);
   }
