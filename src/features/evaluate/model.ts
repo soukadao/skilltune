@@ -8,10 +8,10 @@ export async function evaluateQuery(
   index: number,
   skillName: string,
   runs: number,
-  cwd: string = process.cwd()
+  skillFile: string
 ): Promise<QueryResult> {
   const results = await Promise.all(
-    Array.from({ length: runs }, () => checkSkillTriggered(query.query, cwd, skillName))
+    Array.from({ length: runs }, () => checkSkillTriggered(query.query, skillFile, skillName))
   );
   const triggers = results.filter(Boolean).length;
   const trigger_rate = triggers / runs;
@@ -30,11 +30,11 @@ export async function evaluateAll(
   skillName: string,
   runs: number,
   onProgress?: (result: QueryResult) => void,
-  cwd: string = process.cwd()
+  skillFile: string = ""
 ): Promise<EvalResult> {
   const results = await Promise.all(
     queries.map(async (query, index) => {
-      const result = await evaluateQuery(query, index, skillName, runs, cwd);
+      const result = await evaluateQuery(query, index, skillName, runs, skillFile);
       onProgress?.(result);
       return result;
     })

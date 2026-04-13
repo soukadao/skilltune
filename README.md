@@ -21,6 +21,21 @@ npm install -g skilltune
 - [Claude Code](https://claude.ai/code) (`CLAUDE_CODE_OAUTH_TOKEN` environment variable must be set)
 - Node.js 18+
 
+## How evaluation works
+
+Each evaluation run creates an isolated environment under `.skilltune/eval-XXXXX/` in the current directory, copies only the target `SKILL.md` into it, then runs Claude with `cwd` pointing there. This ensures the project's `CLAUDE.md` is never loaded during evaluation, keeping trigger rate measurements clean.
+
+```
+.skilltune/          # auto-created, gitignored
+  eval-XXXXX/        # temporary, deleted after each evaluation
+    .claude/
+      skills/
+        <name>/
+          SKILL.md
+```
+
+The skill itself can live anywhere — `.claude/skills/`, a custom path, or an absolute path.
+
 ## Usage
 
 ### Optimize a skill directory (recommended)

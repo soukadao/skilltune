@@ -133,8 +133,8 @@ export async function runOptimizeLoop(
         onProgress(
           `[TRAIN][${r.index}] trigger_rate=${r.trigger_rate.toFixed(2)} "${r.query.slice(0, 60)}..."`
         );
-      }),
-      evaluateAll(validation, skillName, runs),
+      }, skillFile),
+      evaluateAll(validation, skillName, runs, undefined, skillFile),
     ]);
 
     const trainScore = calcScore(trainResult);

@@ -1,3 +1,5 @@
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 
 function getOauthToken(): string {
@@ -55,34 +57,48 @@ export async function runClaudeWithSession(
 
 export async function checkSkillTriggered(
   prompt: string,
-  cwd: string,
+  skillFile: string,
   skillName: string
 ): Promise<boolean> {
-  for await (const message of query({
-    prompt,
-    options: {
-      cwd,
-      settingSources: ["project"], // Load skills so Claude can trigger them
-      permissionMode: "dontAsk",
-      env: { CLAUDE_CODE_OAUTH_TOKEN: getOauthToken() },
-    },
-  })) {
-    if (message.type === "assistant") {
-      const content: unknown[] = (message as any).message?.content ?? [];
-      for (const block of content) {
-        if (
-          typeof block === "object" &&
-          block !== null &&
-          "name" in block &&
-          (block as any).name === "Skill" &&
-          (block as any).input?.skill === skillName
-        ) {
-          return true;
+  // Create an isolated eval directory under .skilltune/ so that
+  // settingSources: ["project"] only loads this skill, not the project's CLAUDE.md
+  const skilltuneDirBase = path.join(process.cwd(), ".skilltune");
+  mkdirSync(skilltuneDirBase, { recursive: true });
+  const evalDir = mkdtempSync(path.join(skilltuneDirBase, "eval-"));
+
+  try {
+    const skillDestDir = path.join(evalDir, ".claude", "skills", skillName);
+    mkdirSync(skillDestDir, { recursive: true });
+    writeFileSync(path.join(skillDestDir, "SKILL.md"), readFileSync(skillFile, "utf-8"));
+
+    for await (const message of query({
+      prompt,
+      options: {
+        cwd: evalDir,
+        settingSources: ["project"],
+        permissionMode: "dontAsk",
+        env: { CLAUDE_CODE_OAUTH_TOKEN: getOauthToken() },
+      },
+    })) {
+      if (message.type === "assistant") {
+        const content: unknown[] = (message as any).message?.content ?? [];
+        for (const block of content) {
+          if (
+            typeof block === "object" &&
+            block !== null &&
+            "name" in block &&
+            (block as any).name === "Skill" &&
+            (block as any).input?.skill === skillName
+          ) {
+            return true;
+          }
         }
       }
     }
+    return false;
+  } finally {
+    rmSync(evalDir, { recursive: true, force: true });
   }
-  return false;
 }
 
 

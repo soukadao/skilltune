@@ -23,7 +23,8 @@ export async function run(ctx: Ctx): Promise<void> {
     (r: QueryResult) =>
       console.log(
         `[${r.index}] trigger_rate=${r.trigger_rate.toFixed(2)} "${r.query.slice(0, 60)}..."`
-      )
+      ),
+    skillFile
   );
 
   console.log(`\nPositive rate: ${(result.positive_rate * 100).toFixed(0)}%`);
