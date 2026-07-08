@@ -3,10 +3,14 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 
-function getOauthToken(): string {
-  const token = process.env.CLAUDE_CODE_OAUTH_TOKEN;
-  if (!token) throw new Error("CLAUDE_CODE_OAUTH_TOKEN environment variable is required");
-  return token;
+function getAnthropicApiKey(): string {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY environment variable is required");
+  return apiKey;
+}
+
+function getClaudeEnv(): Record<string, string> {
+  return { ANTHROPIC_API_KEY: getAnthropicApiKey() };
 }
 
 let _claudePath: string | undefined;
@@ -30,7 +34,7 @@ export async function runClaude(prompt: string, cwd: string): Promise<string> {
       cwd,
       settingSources: [], // Do not load CLAUDE.md so the agent runs without project-level system prompt
       pathToClaudeCodeExecutable: getClaudePath(),
-      env: { CLAUDE_CODE_OAUTH_TOKEN: getOauthToken() },
+      env: getClaudeEnv(),
     },
   })) {
     if ("result" in message && message.result) {
@@ -59,7 +63,7 @@ export async function runClaudeWithSession(
       settingSources: [],
       ...(sessionId ? { resume: sessionId } : {}),
       pathToClaudeCodeExecutable: getClaudePath(),
-      env: { CLAUDE_CODE_OAUTH_TOKEN: getOauthToken() },
+      env: getClaudeEnv(),
     },
   })) {
     if (message.type === "system" && (message as any).subtype === "init") {
@@ -95,7 +99,7 @@ export async function checkSkillTriggered(
         settingSources: ["project"],
         permissionMode: "dontAsk",
         pathToClaudeCodeExecutable: getClaudePath(),
-        env: { CLAUDE_CODE_OAUTH_TOKEN: getOauthToken() },
+        env: getClaudeEnv(),
       },
     })) {
       if (message.type === "assistant") {
@@ -118,5 +122,4 @@ export async function checkSkillTriggered(
     rmSync(evalDir, { recursive: true, force: true });
   }
 }
-
 

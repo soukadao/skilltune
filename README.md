@@ -18,7 +18,7 @@ npm install -g skilltune
 
 ## Requirements
 
-- [Claude Code](https://claude.ai/code) (`CLAUDE_CODE_OAUTH_TOKEN` environment variable must be set)
+- [Claude Code](https://claude.ai/code) (`ANTHROPIC_API_KEY` environment variable must be set)
 - Node.js 18+
 
 ## How evaluation works
